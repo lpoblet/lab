@@ -1,0 +1,16 @@
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Project specific
+.junie/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Restic local test/temp files (if any)
+*.bak
