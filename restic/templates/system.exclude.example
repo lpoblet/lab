@@ -1,0 +1,13 @@
+# Common exclusions for system backup
+/dev/*
+/proc/*
+/sys/*
+/tmp/*
+/run/*
+/mnt/*
+/media/*
+/lost+found/*
+/home/*
+/var/lib/docker/*
+/var/cache/*
+/var/tmp/*

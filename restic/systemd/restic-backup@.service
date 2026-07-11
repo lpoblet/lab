@@ -1,0 +1,19 @@
+[Unit]
+Description=Restic backup service (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/restic/%i.repo.env
+ExecStart=/usr/bin/restic backup \
+    --exclude-file=/etc/restic/%i.exclude \
+    --verbose
+ExecStartPost=/usr/bin/restic forget \
+    --keep-daily 7 \
+    --keep-weekly 4 \
+    --keep-monthly 12 \
+    --prune
+
+[Install]
+WantedBy=multi-user.target

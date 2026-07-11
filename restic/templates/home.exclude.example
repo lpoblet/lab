@@ -1,0 +1,10 @@
+# Common exclusions for home backup
+.cache/*
+.local/share/Trash/*
+Downloads/*
+.thumbnails/*
+.direnv/*
+node_modules/*
+venv/*
+.venv/*
+*.bak
