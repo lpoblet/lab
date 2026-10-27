@@ -1,0 +1,111 @@
+# .aiignore
+# Exclude sensitive files and directories
+
+# Secrets and credentials
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.truststore
+.env
+.env.*
+.secrets
+*.secret
+id_rsa*
+*.priv
+*.privkey
+
+# Build artifacts
+dist/
+build/
+target/
+*.class
+*.pyc
+*.pyo
+__pycache__/
+*.o
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Dependencies
+node_modules/
+venv/
+.venv/
+env/
+virtualenv/
+*.egg-info/
+*.whl
+*.tar.gz
+*.zip
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+*.pid
+
+# Infrastructure
+terraform.tfstate*
+*.plan
+*.tfplan
+.terraform/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Package manager locks (to avoid context bloat)
+package-lock.json
+yarn.lock
+poetry.lock
+Cargo.lock
+Gemfile.lock
+composer.lock
+
+# Large binary files (add extensions as needed)
+*.mp4
+*.mp3
+*.avi
+*.mov
+*.wav
+*.flac
+*.iso
+*.bin
+
+# IDE specific
+.idea/
+.vscode/
+*.iml
+.project
+.classpath
+.settings/
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# OS-specific
+System Volume Information/
+$RECYCLE.BIN/
+
+# Other
+.coverage
+.nyc_output
+*.min.js
+*.min.css
