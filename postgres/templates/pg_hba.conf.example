@@ -1,0 +1,76 @@
+# PostgreSQL Host-Based Authentication File (pg_hba.conf)
+#
+# This file controls which clients are allowed to connect to the database.
+# Each line defines a rule in the following format:
+#
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+#
+# TYPE:
+#   local   - Unix domain socket connections (local only)
+#   host    - TCP/IP connections (remote or local)
+#   hostssl - TCP/IP connections requiring SSL
+#   hostnossl - TCP/IP connections without SSL
+#
+# DATABASE:
+#   all             - all databases
+#   sameuser        - databases with the same name as the user
+#   replication     - replication connections
+#   (comma-separated list or database name)
+#
+# USER:
+#   all             - all users
+#   (comma-separated list or username)
+#   +group          - members of a role group
+#
+# ADDRESS (for host types):
+#   127.0.0.1/32    - localhost IPv4
+#   ::1/128         - localhost IPv6
+#   0.0.0.0/0       - all IPv4 addresses
+#   ::/0            - all IPv6 addresses
+#
+# METHOD:
+#   trust           - allow without password (DANGEROUS, for testing only)
+#   reject          - reject connection
+#   md5             - password authentication (MD5 hashed)
+#   scram-sha-256   - password authentication (SCRAM, recommended)
+#   peer            - OS username must match database username (local only)
+#   ident           - use IDENT protocol (not recommended)
+#
+# Rules are processed top-to-bottom. The first match wins.
+
+# ============================================================
+# Local connections (Unix socket)
+# ============================================================
+
+# Superuser can connect locally without a password via peer auth
+local   all             postgres                                peer
+
+# Other local users connect via peer auth
+local   all             all                                     peer
+
+# ============================================================
+# TCP/IP connections
+# ============================================================
+
+# Allow localhost connections with password authentication
+host    all             all             127.0.0.1/32            scram-sha-256
+host    all             all             ::1/128                 scram-sha-256
+
+# ============================================================
+# Practice exercises
+# ============================================================
+#
+# 1. Change the authentication method from scram-sha-256 to md5 and restart.
+#    Notice the difference in how passwords are stored.
+#
+# 2. Add a rule to allow connections from a specific subnet:
+#    host    all         all         192.168.1.0/24          scram-sha-256
+#
+# 3. Add a rule to reject connections from a specific IP:
+#    host    all         all         10.0.0.5/32             reject
+#
+# 4. Create a rule that allows a specific user to connect without a password
+#    (trust method) — then test it and remove it (security risk!).
+#
+# 5. Restrict a user to only connect to a specific database:
+#    host    practice_db lpic_student  127.0.0.1/32          scram-sha-256

@@ -1,0 +1,124 @@
+# PostgreSQL Configuration File (postgresql.conf)
+#
+# This is the main configuration file for the PostgreSQL server.
+# Settings control networking, memory, logging, and query behavior.
+#
+# To apply changes, restart the PostgreSQL service or reload configuration:
+#   SELECT pg_reload_conf();
+#   OR: docker compose restart postgres
+
+# ============================================================
+# Connection Settings
+# ============================================================
+
+# What interface to listen on:
+#   'localhost'       - only local connections
+#   '*'               - all interfaces (be careful with security!)
+#   'localhost,10.0.0.5' - specific interfaces
+listen_addresses = 'localhost'
+
+# TCP port (default: 5432)
+port = 5432
+
+# Maximum number of simultaneous connections
+max_connections = 100
+
+# ============================================================
+# Memory Settings
+# ============================================================
+
+# Shared memory for caching data (25% of RAM is a common starting point)
+# For a practice container, 128MB is reasonable
+shared_buffers = 128MB
+
+# Memory per query for sorting and hashing
+work_mem = 4MB
+
+# Memory for maintenance operations (VACUUM, CREATE INDEX)
+maintenance_work_mem = 64MB
+
+# Effective cache size (OS page cache + shared_buffers, ~50-75% of RAM)
+effective_cache_size = 512MB
+
+# ============================================================
+# Write-Ahead Log (WAL)
+# ============================================================
+
+# Maximum WAL size before a checkpoint
+max_wal_size = 1GB
+
+# Minimum WAL size to retain
+min_wal_size = 80MB
+
+# ============================================================
+# Logging
+# ============================================================
+
+# Where to send log messages
+log_destination = 'stderr'
+
+# Enable log collection to files
+logging_collector = on
+
+# Log directory (relative to PGDATA)
+log_directory = 'log'
+
+# Log file name pattern
+log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+
+# Log statements that take longer than this (in milliseconds)
+log_min_duration_statement = 1000
+
+# Log connection attempts
+log_connections = on
+
+# Log disconnections
+log_disconnections = on
+
+# Log duration of all statements
+# log_statement = 'all'  # Uncomment to log every query (useful for debugging)
+
+# ============================================================
+# Query Tuning
+# ============================================================
+
+# Default statistics target for query planning
+default_statistics_target = 100
+
+# Random page cost (lower for SSDs, default 4.0 for HDDs)
+random_page_cost = 4.0
+
+# Sequential page cost
+seq_page_cost = 1.0
+
+# ============================================================
+# Authentication
+# ============================================================
+
+# Password encryption method (recommended: scram-sha-256)
+password_encryption = scram-sha-256
+
+# ============================================================
+# Locale and Formatting
+# ============================================================
+
+# Default text search configuration
+default_text_search_config = 'pg_catalog.english'
+
+# ============================================================
+# Practice Exercises
+# ============================================================
+#
+# 1. Change the port from 5432 to 5433, restart, and verify the new port.
+#
+# 2. Increase shared_buffers to 256MB and observe memory usage.
+#
+# 3. Enable log_statement = 'all' to see every query — useful for learning
+#    what queries your application generates.
+#
+# 4. Change log_min_duration_statement to 0 to log all statement durations.
+#
+# 5. Adjust work_mem and run a complex query to see how it affects performance.
+#
+# 6. Change listen_addresses to '*' and update pg_hba.conf to allow
+#    remote connections from your machine.
