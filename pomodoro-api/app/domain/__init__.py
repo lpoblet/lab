@@ -1,17 +1,9 @@
-from app.domain.session import (
-    InvalidSessionTransition,
-    SessionKind,
-    SessionStatus,
-    PomodoroSession,
-    complete_session,
-    interrupt_session,
-)
+from app.domain.catalog import Project, Task
+from app.domain.session import NewSession, PomodoroSession
 
 __all__ = [
-    "InvalidSessionTransition",
-    "SessionKind",
-    "SessionStatus",
+    "NewSession",
     "PomodoroSession",
-    "complete_session",
-    "interrupt_session",
+    "Project",
+    "Task",
 ]

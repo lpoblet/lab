@@ -1,84 +1,90 @@
 from datetime import datetime, timedelta, timezone
-from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
 
-from app.domain.session import (
-    InvalidSessionTransition,
-    PomodoroSession,
-    SessionKind,
-    SessionStatus,
-    complete_session,
-    interrupt_session,
-    utcnow,
-)
+from app.domain.session import MAX_SECONDS, NewSession, PomodoroSession
 
 
-def _running(**overrides) -> PomodoroSession:
+def _stored(**overrides) -> PomodoroSession:
     data = {
-        "kind": SessionKind.FOCUS,
-        "duration_minutes": 25,
-        "label": "deep work",
+        "id": "ABCDEF12-3456-7890-ABCD-EF1234567890",
+        "task_id": "T1",
+        "interval_seconds": 1500,
+        "pomodoro_interval": 1500,
+        "end_date": datetime(2026, 11, 12, 10, 25, tzinfo=timezone.utc),
     }
     data.update(overrides)
     return PomodoroSession(**data)
 
 
-def test_new_session_is_running_with_null_ended_at() -> None:
-    session = _running()
-    assert session.status is SessionStatus.RUNNING
-    assert session.ended_at is None
+def test_started_at_is_end_date_minus_interval() -> None:
+    session = _stored(interval_seconds=600)
+    assert session.started_at == datetime(2026, 11, 12, 10, 15, tzinfo=timezone.utc)
 
 
-def test_complete_running_sets_status_and_ended_at() -> None:
-    session = _running()
-    ended = session.started_at + timedelta(minutes=25)
-    completed = complete_session(session, ended_at=ended)
-    assert completed.status is SessionStatus.COMPLETED
-    assert completed.ended_at == ended
-    assert completed.id == session.id
+def test_started_at_is_none_without_end_date() -> None:
+    assert _stored(end_date=None).started_at is None
 
 
-def test_interrupt_running_sets_status_and_ended_at() -> None:
-    session = _running()
-    interrupted = interrupt_session(session)
-    assert interrupted.status is SessionStatus.INTERRUPTED
-    assert interrupted.ended_at is not None
-    assert interrupted.ended_at >= session.started_at
+def test_completed_reflects_planned_interval() -> None:
+    assert _stored(interval_seconds=1500, pomodoro_interval=1500).completed is True
+    assert _stored(interval_seconds=1499, pomodoro_interval=1500).completed is False
+    assert _stored(pomodoro_interval=None).completed is True
+    assert _stored(interval_seconds=None).completed is False
 
 
-def test_complete_non_running_raises() -> None:
-    session = complete_session(_running())
-    with pytest.raises(InvalidSessionTransition):
-        complete_session(session)
+def test_session_is_frozen_and_keeps_id_case() -> None:
+    session = _stored(id="MixedCase-Id")
+    assert session.id == "MixedCase-Id"
+    with pytest.raises(ValidationError):
+        session.state = -1  # type: ignore[misc]
 
 
-def test_interrupt_completed_raises() -> None:
-    session = complete_session(_running())
-    with pytest.raises(InvalidSessionTransition):
-        interrupt_session(session)
+def test_naive_timestamps_are_utc() -> None:
+    naive = datetime(2026, 11, 12, 10, 25)
+    assert _stored(end_date=naive).end_date == naive.replace(tzinfo=timezone.utc)
+    assert NewSession(task_id="T1", interval_seconds=1, end_date=naive).end_date.tzinfo is not None
 
 
-def test_complete_ended_before_started_raises() -> None:
-    started = utcnow()
-    session = _running(started_at=started)
-    with pytest.raises(InvalidSessionTransition):
-        complete_session(session, ended_at=started - timedelta(seconds=1))
+def test_computed_fields_are_serialized() -> None:
+    dumped = _stored().model_dump()
+    assert dumped["started_at"] == dumped["end_date"] - timedelta(seconds=1500)
+    assert dumped["completed"] is True
 
 
-def test_running_with_ended_at_rejected() -> None:
-    with pytest.raises(ValueError):
-        PomodoroSession(
-            id=uuid4(),
-            kind=SessionKind.FOCUS,
-            status=SessionStatus.RUNNING,
-            duration_minutes=25,
-            started_at=utcnow(),
-            ended_at=utcnow(),
-        )
+def test_new_session_defaults() -> None:
+    new = NewSession(task_id="T1", interval_seconds=1500)
+    assert new.pomodoro_interval is None
+    assert new.subtask_id is None
+    assert new.end_date is None
+    assert new.is_manual is False
 
 
-def test_naive_timestamps_are_made_aware() -> None:
-    naive = datetime(2026, 1, 1, 12, 0, 0)
-    session = _running(started_at=naive)
-    assert session.started_at.tzinfo == timezone.utc
+@pytest.mark.parametrize("seconds", [0, -1, MAX_SECONDS + 1, True, "1500", 1500.0])
+def test_new_session_rejects_bad_seconds(seconds: object) -> None:
+    with pytest.raises(ValidationError):
+        NewSession(task_id="T1", interval_seconds=seconds)
+    with pytest.raises(ValidationError):
+        NewSession(task_id="T1", interval_seconds=1, pomodoro_interval=seconds)
+
+
+def test_new_session_accepts_bounds() -> None:
+    assert NewSession(task_id="T1", interval_seconds=1).interval_seconds == 1
+    assert NewSession(task_id="T1", interval_seconds=MAX_SECONDS).interval_seconds == MAX_SECONDS
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"task_id": ""},
+        {"task_id": "x" * 65},
+        {"subtask_id": ""},
+        {"end_date": "not-a-date"},
+        {"is_manual": "yes"},
+        {"kind": "focus"},
+    ],
+)
+def test_new_session_rejects_bad_fields(overrides: dict) -> None:
+    with pytest.raises(ValidationError):
+        NewSession(**{"task_id": "T1", "interval_seconds": 1500, **overrides})

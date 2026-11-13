@@ -1,73 +1,154 @@
 from datetime import datetime
-from uuid import UUID
+from typing import Any
+from uuid import uuid4
 
 from sqlalchemy import Select, select, update
+from sqlalchemy.orm import Session
 
 from app.db.engine import get_session_factory
-from app.db.models import PomodoroSessionRow
+from app.db.models import PomodoroSessionRow, ProjectRow, SubtaskRow, TaskRow
+from app.domain.catalog import Project, Task
 from app.domain.session import (
-    InvalidSessionTransition,
+    POMODORO_OBJ_TYPE,
+    STATE_ACTIVE,
+    STATE_DELETED,
+    SYNC_LOCAL,
+    NewSession,
     PomodoroSession,
-    SessionStatus,
     utcnow,
 )
 
 
 class SessionNotFound(Exception):
-    def __init__(self, session_id: UUID) -> None:
+    def __init__(self, session_id: str) -> None:
         super().__init__(f"Session {session_id} not found")
         self.session_id = session_id
 
 
-def _to_domain(row: PomodoroSessionRow) -> PomodoroSession:
-    return PomodoroSession.model_validate(row, from_attributes=True)
+class TaskNotFound(Exception):
+    def __init__(self, task_id: str) -> None:
+        super().__init__(f"Task {task_id} not found")
+        self.task_id = task_id
 
 
-def _list_stmt(from_ts: datetime | None, to_ts: datetime | None) -> Select[tuple[PomodoroSessionRow]]:
-    stmt = select(PomodoroSessionRow)
-    if from_ts is not None:
-        stmt = stmt.where(PomodoroSessionRow.started_at >= from_ts)
-    if to_ts is not None:
-        stmt = stmt.where(PomodoroSessionRow.started_at <= to_ts)
-    return stmt.order_by(PomodoroSessionRow.started_at.desc(), PomodoroSessionRow.id.desc())
+class SubtaskNotFound(Exception):
+    def __init__(self, subtask_id: str) -> None:
+        super().__init__(f"Subtask {subtask_id} not found")
+        self.subtask_id = subtask_id
 
 
-def create_session(session: PomodoroSession) -> PomodoroSession:
-    row = PomodoroSessionRow(
-        id=session.id,
-        kind=session.kind,
-        status=session.status,
-        duration_minutes=session.duration_minutes,
-        label=session.label,
-        started_at=session.started_at,
-        ended_at=session.ended_at,
+class SubtaskMismatch(Exception):
+    def __init__(self, subtask_id: str, task_id: str) -> None:
+        super().__init__(f"Subtask {subtask_id} does not belong to task {task_id}")
+        self.subtask_id = subtask_id
+        self.task_id = task_id
+
+
+_SESSION_COLUMNS = tuple(column.key for column in PomodoroSessionRow.__table__.columns)
+
+
+def _not_deleted(state_column: Any) -> Any:
+    # The extension soft-deletes with state = -1; NULL states count as live.
+    return state_column.is_distinct_from(STATE_DELETED)
+
+
+def _to_domain(row: PomodoroSessionRow, task_name: str | None) -> PomodoroSession:
+    data = {key: getattr(row, key) for key in _SESSION_COLUMNS}
+    return PomodoroSession.model_validate({**data, "task_name": task_name})
+
+
+def _session_stmt() -> Select[tuple[PomodoroSessionRow, str | None]]:
+    return (
+        select(PomodoroSessionRow, TaskRow.name)
+        .outerjoin(TaskRow, TaskRow.id == PomodoroSessionRow.task_id)
+        .where(_not_deleted(PomodoroSessionRow.state))
     )
+
+
+def _live_task(db: Session, task_id: str) -> TaskRow:
+    task = db.get(TaskRow, task_id)
+    if task is None or task.state == STATE_DELETED:
+        raise TaskNotFound(task_id)
+    return task
+
+
+def _check_subtask(db: Session, subtask_id: str, task_id: str) -> None:
+    subtask = db.get(SubtaskRow, subtask_id)
+    if subtask is None or subtask.state == STATE_DELETED:
+        raise SubtaskNotFound(subtask_id)
+    if subtask.task_id != task_id:
+        raise SubtaskMismatch(subtask_id, task_id)
+
+
+def create_session(new: NewSession) -> PomodoroSession:
+    end_date = new.end_date or utcnow()
     factory = get_session_factory()
     with factory() as db:
         with db.begin():
+            task = _live_task(db, new.task_id)
+            if new.subtask_id is not None:
+                _check_subtask(db, new.subtask_id, new.task_id)
+            row = PomodoroSessionRow(
+                # Upper-case uuid4 text is the extension's dominant id format.
+                id=str(uuid4()).upper(),
+                task_id=task.id,
+                subtask_id=new.subtask_id,
+                obj_type=POMODORO_OBJ_TYPE,
+                interval_seconds=new.interval_seconds,
+                pomodoro_interval=(
+                    new.pomodoro_interval
+                    if new.pomodoro_interval is not None
+                    else task.pomodoro_interval
+                ),
+                is_manual=new.is_manual,
+                state=STATE_ACTIVE,
+                sync=SYNC_LOCAL,
+                # The extension writes creation_date equal to end_date.
+                creation_date=end_date,
+                end_date=end_date,
+            )
             db.add(row)
+            task_name = task.name
         db.refresh(row)
-        return _to_domain(row)
+        return _to_domain(row, task_name)
 
 
-def get_session(session_id: UUID) -> PomodoroSession:
+def get_session(session_id: str) -> PomodoroSession:
     factory = get_session_factory()
     with factory() as db:
-        row = db.get(PomodoroSessionRow, session_id)
-        if row is None:
+        result = db.execute(_session_stmt().where(PomodoroSessionRow.id == session_id)).first()
+        if result is None:
             raise SessionNotFound(session_id)
-        return _to_domain(row)
+        row, task_name = result
+        return _to_domain(row, task_name)
 
 
-def list_sessions(from_ts: datetime | None = None, to_ts: datetime | None = None) -> list[PomodoroSession]:
+def list_sessions(
+    from_ts: datetime | None = None,
+    to_ts: datetime | None = None,
+    task_id: str | None = None,
+) -> list[PomodoroSession]:
+    stmt = _session_stmt()
+    if from_ts is not None:
+        stmt = stmt.where(PomodoroSessionRow.end_date >= from_ts)
+    if to_ts is not None:
+        stmt = stmt.where(PomodoroSessionRow.end_date <= to_ts)
+    if task_id is not None:
+        stmt = stmt.where(PomodoroSessionRow.task_id == task_id)
+    stmt = stmt.order_by(
+        PomodoroSessionRow.end_date.desc().nulls_last(), PomodoroSessionRow.id.desc()
+    )
     factory = get_session_factory()
     with factory() as db:
-        rows = db.scalars(_list_stmt(from_ts, to_ts)).all()
-        return [_to_domain(row) for row in rows]
+        return [_to_domain(row, task_name) for row, task_name in db.execute(stmt).all()]
 
 
-def _end_session(session_id: UUID, action: str, status: SessionStatus) -> PomodoroSession:
-    ended_at = utcnow()
+def soft_delete_session(session_id: str) -> None:
+    """Mark a session deleted (state = -1) in one conditional UPDATE.
+
+    The state check in the WHERE clause makes concurrent deletes race-free: only
+    one caller sees rowcount 1, every other one gets SessionNotFound.
+    """
     factory = get_session_factory()
     with factory() as db:
         with db.begin():
@@ -75,27 +156,30 @@ def _end_session(session_id: UUID, action: str, status: SessionStatus) -> Pomodo
                 update(PomodoroSessionRow)
                 .where(
                     PomodoroSessionRow.id == session_id,
-                    PomodoroSessionRow.status == SessionStatus.RUNNING,
+                    _not_deleted(PomodoroSessionRow.state),
                 )
-                .values(status=status, ended_at=ended_at)
+                .values(state=STATE_DELETED)
             )
-            if result.rowcount == 1:
-                row = db.get(PomodoroSessionRow, session_id)
-                if row is None:
-                    raise SessionNotFound(session_id)
-                return _to_domain(row)
-
-            row = db.get(PomodoroSessionRow, session_id)
-            if row is None:
+            if result.rowcount != 1:
                 raise SessionNotFound(session_id)
-            raise InvalidSessionTransition(
-                f"Cannot {action} session {session_id} with status {row.status}"
-            )
 
 
-def complete(session_id: UUID) -> PomodoroSession:
-    return _end_session(session_id, "complete", SessionStatus.COMPLETED)
+def list_projects() -> list[Project]:
+    stmt = (
+        select(ProjectRow)
+        .where(_not_deleted(ProjectRow.state))
+        .order_by(ProjectRow.sort_order.asc().nulls_last(), ProjectRow.name, ProjectRow.id)
+    )
+    factory = get_session_factory()
+    with factory() as db:
+        return [Project.model_validate(row) for row in db.scalars(stmt).all()]
 
 
-def interrupt(session_id: UUID) -> PomodoroSession:
-    return _end_session(session_id, "interrupt", SessionStatus.INTERRUPTED)
+def list_tasks(project_id: str | None = None) -> list[Task]:
+    stmt = select(TaskRow).where(_not_deleted(TaskRow.state))
+    if project_id is not None:
+        stmt = stmt.where(TaskRow.project_id == project_id)
+    stmt = stmt.order_by(TaskRow.sort_order.asc().nulls_last(), TaskRow.name, TaskRow.id)
+    factory = get_session_factory()
+    with factory() as db:
+        return [Task.model_validate(row) for row in db.scalars(stmt).all()]

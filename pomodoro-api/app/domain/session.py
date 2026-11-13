@@ -1,26 +1,20 @@
-from datetime import datetime, timezone
-from enum import StrEnum
-from uuid import UUID, uuid4
+"""Finished focus blocks, modelled the way the Focus To-Do extension stores them.
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+The extension only writes a row once a pomodoro ends: ``end_date`` is the end
+time, ``interval_seconds`` the actual focused time and ``pomodoro_interval`` the
+planned length. The start time is never stored, so it is derived.
+"""
+from datetime import datetime, timedelta, timezone
 
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, computed_field, field_validator
 
-class SessionKind(StrEnum):
-    FOCUS = "focus"
-    SHORT_BREAK = "short_break"
-    LONG_BREAK = "long_break"
-
-
-class SessionStatus(StrEnum):
-    RUNNING = "running"
-    COMPLETED = "completed"
-    INTERRUPTED = "interrupted"
-
-
-class InvalidSessionTransition(Exception):
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-        self.message = message
+MAX_SECONDS = 86_400
+MAX_ID_LENGTH = 64
+POMODORO_OBJ_TYPE = "POMODORO"
+STATE_ACTIVE = 0
+STATE_DELETED = -1
+# Rows written by the API were never synced to the Focus To-Do cloud; imports carry 1.
+SYNC_LOCAL = 0
 
 
 def utcnow() -> datetime:
@@ -33,64 +27,68 @@ def _ensure_aware(ts: datetime) -> datetime:
     return ts
 
 
+class NewSession(BaseModel):
+    """Body of ``POST /sessions``: a pomodoro that has already finished."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    task_id: str = Field(min_length=1, max_length=MAX_ID_LENGTH)
+    subtask_id: str | None = Field(default=None, min_length=1, max_length=MAX_ID_LENGTH)
+    interval_seconds: int = Field(gt=0, le=MAX_SECONDS, strict=True)
+    pomodoro_interval: int | None = Field(default=None, gt=0, le=MAX_SECONDS, strict=True)
+    end_date: datetime | None = None
+    is_manual: StrictBool = False
+
+    @field_validator("end_date", mode="after")
+    @classmethod
+    def _end_date_aware(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        return _ensure_aware(value)
+
+
 class PomodoroSession(BaseModel):
+    """A stored ``pomodoro_sessions`` row plus the linked task name.
+
+    Columns are nullable in the export schema, so imported rows may lack
+    values; derived fields then fall back to ``None``.
+    """
+
     model_config = ConfigDict(frozen=True)
 
-    id: UUID = Field(default_factory=uuid4)
-    kind: SessionKind
-    status: SessionStatus = SessionStatus.RUNNING
-    duration_minutes: int = Field(gt=0, le=1440, strict=True)
-    label: str | None = Field(default=None, max_length=256)
-    started_at: datetime = Field(default_factory=utcnow)
-    ended_at: datetime | None = None
+    id: str
+    task_id: str | None = None
+    task_name: str | None = None
+    subtask_id: str | None = None
+    obj_type: str | None = None
+    interval_seconds: int | None = None
+    pomodoro_interval: int | None = None
+    is_manual: bool = False
+    state: int | None = None
+    sync: int | None = None
+    creation_date: datetime | None = None
+    end_date: datetime | None = None
 
-    @field_validator("started_at", "ended_at", mode="after")
+    @field_validator("creation_date", "end_date", mode="after")
     @classmethod
     def _timestamps_aware(cls, value: datetime | None) -> datetime | None:
         if value is None:
             return None
         return _ensure_aware(value)
 
-    @model_validator(mode="after")
-    def _status_matches_ended_at(self) -> "PomodoroSession":
-        if self.status == SessionStatus.RUNNING:
-            if self.ended_at is not None:
-                raise ValueError("running sessions must have ended_at unset")
-        elif self.ended_at is None:
-            raise ValueError(f"{self.status.value} sessions must have ended_at set")
-        elif self.ended_at < self.started_at:
-            raise ValueError("ended_at must not be before started_at")
-        return self
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def started_at(self) -> datetime | None:
+        if self.end_date is None or self.interval_seconds is None:
+            return None
+        return self.end_date - timedelta(seconds=self.interval_seconds)
 
-
-def _require_running(session: PomodoroSession, action: str) -> None:
-    if session.status != SessionStatus.RUNNING:
-        raise InvalidSessionTransition(
-            f"Cannot {action} session {session.id} with status {session.status.value}"
-        )
-
-
-def _ended_copy(
-    session: PomodoroSession,
-    action: str,
-    status: SessionStatus,
-    ended_at: datetime | None,
-) -> PomodoroSession:
-    _require_running(session, action)
-    end = _ensure_aware(ended_at or utcnow())
-    start = _ensure_aware(session.started_at)
-    if end < start:
-        raise InvalidSessionTransition(
-            f"Cannot {action} session {session.id}: ended_at is before started_at"
-        )
-    return PomodoroSession.model_validate(
-        {**session.model_dump(), "status": status, "ended_at": end}
-    )
-
-
-def complete_session(session: PomodoroSession, ended_at: datetime | None = None) -> PomodoroSession:
-    return _ended_copy(session, "complete", SessionStatus.COMPLETED, ended_at)
-
-
-def interrupt_session(session: PomodoroSession, ended_at: datetime | None = None) -> PomodoroSession:
-    return _ended_copy(session, "interrupt", SessionStatus.INTERRUPTED, ended_at)
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def completed(self) -> bool:
+        """True when the focused time reached the planned interval."""
+        if self.interval_seconds is None:
+            return False
+        if self.pomodoro_interval is None:
+            return True
+        return self.interval_seconds >= self.pomodoro_interval
