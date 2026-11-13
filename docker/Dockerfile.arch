@@ -1,0 +1,89 @@
+# syntax=docker/dockerfile:1
+FROM archlinux:latest
+
+# Initialize pacman keys and update system (required for Arch Docker images)
+RUN pacman-key --init && \
+    pacman-key --populate archlinux && \
+    pacman -Syu --noconfirm
+
+# Install essential tools for LPIC-1 practice
+# Covers: file management, users, permissions, networking, systemd, packages, shells, etc.
+RUN pacman -S --noconfirm --needed \
+    # Core utilities (LPIC-1 Objective 100-101: Linux Installation & Hardware)
+    curl \
+    wget \
+    gnupg \
+    # Shell & text processing (LPIC-1 Objective 100-103: Shells)
+    bash \
+    vim \
+    less \
+    tree \
+    jq \
+    # File & disk management (LPIC-1 Objective 100-104: FS & Disk Management)
+    e2fsprogs \
+    parted \
+    lvm2 \
+    util-linux \
+    # Users & groups (LPIC-1 Objective 100-105: Users & Groups)
+    sudo \
+    # Networking (LPIC-1 Objective 100-107: Networking)
+    iproute2 \
+    iputils \
+    net-tools \
+    bind-utils \
+    nmap \
+    # System administration (LPIC-1 Objective 100-108: System Startup & Boot)
+    systemd \
+    # Development tools (LPIC-1 Objective 100-109: Dev Basics)
+    gcc \
+    make \
+    git \
+    # Monitoring & logging (LPIC-1 Objective 100-110: Security)
+    procps-ng \
+    sysstat \
+    strace \
+    ltrace \
+    # Compression & archives
+    tar \
+    gzip \
+    bzip2 \
+    xz \
+    zip \
+    unzip \
+    # Cron & scheduling
+    cronie \
+    # SSH server for practice
+    openssh \
+    # Man pages
+    man-db \
+    man-pages \
+    # Clean up
+    && rm -rf /var/cache/pacman/pkg
+
+# Create a non-root user "student" for practice (LPIC-1 user management)
+ARG USERNAME=student
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
+
+RUN groupadd --gid "$USER_GID" "$USERNAME" && \
+    useradd --uid "$USER_UID" --gid "$USER_GID" -m -s /bin/bash "$USERNAME" && \
+    echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/"$USERNAME" && \
+    chmod 0440 "/etc/sudoers.d/$USERNAME"
+
+# Clone dotfiles to a temporary location for the entrypoint to copy
+ARG DOTFILES_REPO=https://github.com/lpoblet/dotfiles
+RUN git clone "$DOTFILES_REPO" /opt/dotfiles
+
+# Copy entrypoint script that initializes the home directory on first run
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Set working directory
+WORKDIR "/home/$USERNAME"
+
+# Switch to the student user
+USER "$USERNAME"
+
+# Use entrypoint to initialize, then drop to shell
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["/bin/bash"]

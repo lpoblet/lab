@@ -1,0 +1,184 @@
+# LPIC-1 Practice Environment
+# Run all distros: docker compose up -d
+# Enter a container: docker compose exec <distro> bash
+
+services:
+  debian:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        USERNAME: ${USERNAME:-student}
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+        DOTFILES_REPO: ${DOTFILES_REPO:-https://github.com/lpoblet/dotfiles}
+    container_name: lpic1-debian
+    hostname: debian-practice
+    privileged: true  # Needed for systemd, disk management, and networking practice
+    stdin_open: true
+    tty: true
+    volumes:
+      - debian-home:/home/student
+      - ${SCRIPTS_PATH:-../}:/home/student/scripts:ro
+    environment:
+      - LANG=en_US.UTF-8
+      - LC_ALL=en_US.UTF-8
+    command: ["sleep", "infinity"]
+    networks:
+      - lpic1-network
+    ports:
+      - "${SSH_PORT_DEBIAN:-2222}:22"
+    restart: "no"
+
+  ubuntu:
+    build:
+      context: .
+      dockerfile: Dockerfile.ubuntu
+      args:
+        USERNAME: ${USERNAME:-student}
+        USER_UID: 1001
+        USER_GID: 1001
+        DOTFILES_REPO: ${DOTFILES_REPO:-https://github.com/lpoblet/dotfiles}
+    container_name: lpic1-ubuntu
+    hostname: ubuntu-practice
+    privileged: true
+    stdin_open: true
+    tty: true
+    volumes:
+      - ubuntu-home:/home/student
+      - ${SCRIPTS_PATH:-../}:/home/student/scripts:ro
+    environment:
+      - LANG=en_US.UTF-8
+      - LC_ALL=en_US.UTF-8
+    command: ["sleep", "infinity"]
+    networks:
+      - lpic1-network
+    ports:
+      - "${SSH_PORT_UBUNTU:-2223}:22"
+    restart: "no"
+
+  fedora:
+    build:
+      context: .
+      dockerfile: Dockerfile.fedora
+      args:
+        USERNAME: ${USERNAME:-student}
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+        DOTFILES_REPO: ${DOTFILES_REPO:-https://github.com/lpoblet/dotfiles}
+    container_name: lpic1-fedora
+    hostname: fedora-practice
+    privileged: true
+    stdin_open: true
+    tty: true
+    volumes:
+      - fedora-home:/home/student
+      - ${SCRIPTS_PATH:-../}:/home/student/scripts:ro
+    environment:
+      - LANG=en_US.UTF-8
+      - LC_ALL=en_US.UTF-8
+    command: ["sleep", "infinity"]
+    networks:
+      - lpic1-network
+    ports:
+      - "${SSH_PORT_FEDORA:-2224}:22"
+    restart: "no"
+
+  arch:
+    build:
+      context: .
+      dockerfile: Dockerfile.arch
+      args:
+        USERNAME: ${USERNAME:-student}
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+        DOTFILES_REPO: ${DOTFILES_REPO:-https://github.com/lpoblet/dotfiles}
+    container_name: lpic1-arch
+    hostname: arch-practice
+    privileged: true
+    stdin_open: true
+    tty: true
+    volumes:
+      - arch-home:/home/student
+      - ${SCRIPTS_PATH:-../}:/home/student/scripts:ro
+    environment:
+      - LANG=en_US.UTF-8
+      - LC_ALL=en_US.UTF-8
+    command: ["sleep", "infinity"]
+    networks:
+      - lpic1-network
+    ports:
+      - "${SSH_PORT_ARCH:-2225}:22"
+    restart: "no"
+
+  opensuse:
+    build:
+      context: .
+      dockerfile: Dockerfile.opensuse
+      args:
+        USERNAME: ${USERNAME:-student}
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+        DOTFILES_REPO: ${DOTFILES_REPO:-https://github.com/lpoblet/dotfiles}
+    container_name: lpic1-opensuse
+    hostname: opensuse-practice
+    privileged: true
+    stdin_open: true
+    tty: true
+    volumes:
+      - opensuse-home:/home/student
+      - ${SCRIPTS_PATH:-../}:/home/student/scripts:ro
+    environment:
+      - LANG=en_US.UTF-8
+      - LC_ALL=en_US.UTF-8
+    command: ["sleep", "infinity"]
+    networks:
+      - lpic1-network
+    ports:
+      - "${SSH_PORT_OPENSUSE:-2226}:22"
+    restart: "no"
+
+  alpine:
+    build:
+      context: .
+      dockerfile: Dockerfile.alpine
+      args:
+        USERNAME: ${USERNAME:-student}
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+        DOTFILES_REPO: ${DOTFILES_REPO:-https://github.com/lpoblet/dotfiles}
+    container_name: lpic1-alpine
+    hostname: alpine-practice
+    privileged: true
+    stdin_open: true
+    tty: true
+    volumes:
+      - alpine-home:/home/student
+      - ${SCRIPTS_PATH:-../}:/home/student/scripts:ro
+    environment:
+      - LANG=en_US.UTF-8
+      - LC_ALL=en_US.UTF-8
+    command: ["sleep", "infinity"]
+    networks:
+      - lpic1-network
+    ports:
+      - "${SSH_PORT_ALPINE:-2227}:22"
+    restart: "no"
+
+volumes:
+  debian-home:
+    driver: local
+  ubuntu-home:
+    driver: local
+  fedora-home:
+    driver: local
+  arch-home:
+    driver: local
+  opensuse-home:
+    driver: local
+  alpine-home:
+    driver: local
+
+networks:
+  lpic1-network:
+    driver: bridge
