@@ -1,16 +1,160 @@
+# ──────────────────────────────────────────────
 # IDEs and editors
+# ──────────────────────────────────────────────
 .idea/
 .vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# Vim
 *.swp
 *.swo
 *~
+[._]*.s[a-v][a-z]
+[._]*.s[a-z][a-z]
+*.un~
+Session.vim
 
+# Emacs
+#\#*#
+.\#*
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.org-id-locations
+# Emacs custom
+/.custom
+
+# ──────────────────────────────────────────────
+# Python
+# ──────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+*.pyc
+.tox/
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+ipdb.pth
+hypothesis/
+.pyre/
+.pytype/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+.env
+.env.*
+!.env.example
+
+# Jupyter
+.ipynb_checkpoints
+
+# Sphinx / docs
+docs/_build/
+*.rst.txt
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Flask / FastAPI uploads
+/instance/
+/webpack-stats.json
+
+# Database (SQLite)
+*.db
+*.sqlite
+*.sqlite3
+
+# ──────────────────────────────────────────────
+# Docker & Compose
+# ──────────────────────────────────────────────
+# Docker Compose override files (local dev)
+docker-compose*.local.yml
+docker-compose*.local.yaml
+docker-compose*.override.yml
+docker-compose*.override.yaml
+
+# .dockerignore is kept; ignore Docker cache
+.docker/
+
+# ──────────────────────────────────────────────
+# Kubernetes
+# ──────────────────────────────────────────────
+# Minikube / kind / k3s local clusters
+.kube/
+kubeconfig
+*.kubeconfig
+
+# kubectl state
+.kube-linter/
+
+# ──────────────────────────────────────────────
+# Logs
+# ──────────────────────────────────────────────
+*.log
+logs/
+*.out
+
+# ──────────────────────────────────────────────
+# OS / System files
+# ──────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ──────────────────────────────────────────────
 # Project specific
+# ──────────────────────────────────────────────
 .junie/
 
-# System files
-.DS_Store
-Thumbs.db
-
-# Restic local test/temp files (if any)
+# Backups & temp
 *.bak
+*.tmp
+*.temp
+*.cache
+
+# Archives
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.rar
+*.7z
+
+# Secrets / credentials (defensive)
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+id_rsa
+id_ed25519
+id_ecdsa

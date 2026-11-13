@@ -30,7 +30,7 @@ RUN pacman -S --noconfirm --needed \
     iproute2 \
     iputils \
     net-tools \
-    bind-utils \
+    bind-tools \
     nmap \
     # System administration (LPIC-1 Objective 100-108: System Startup & Boot)
     systemd \
