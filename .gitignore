@@ -141,6 +141,9 @@ $RECYCLE.BIN/
 *.temp
 *.cache
 
+# PostgreSQL backups (may contain personal data)
+postgres/backups/
+
 # Archives
 *.tar
 *.tar.gz
