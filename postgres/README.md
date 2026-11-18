@@ -35,6 +35,41 @@ Running PostgreSQL in Docker gives you:
 - **Portability** — works the same on any machine with Docker.
 - **Realistic practice** — you still interact with the database via `psql`, `pg_dump`, etc., just like on a real server.
 
+## Persistent Storage
+
+This environment uses a **bind mount** for persistent data storage instead of a Docker named volume. The PostgreSQL data directory is stored on a separate partition at `/mnt/backups/data/` on the host machine.
+
+### Configuration
+
+In `docker-compose.yml`, the volume is configured as:
+
+```yaml
+volumes:
+  - /mnt/backups/data:/var/lib/postgresql/data
+```
+
+This means all database files are stored directly on the host filesystem at `/mnt/backups/data/`, surviving container restarts and recreations.
+
+### Prerequisites
+
+Before starting the container, ensure the host directory exists with correct permissions:
+
+```bash
+sudo mkdir -p /mnt/backups/data
+sudo chown 70:70 /mnt/backups/data
+sudo chmod 700 /mnt/backups/data
+```
+
+The PostgreSQL container runs as UID 70 (the `postgres` user), so the directory must be owned by that user.
+
+### Migration Notes
+
+This configuration was migrated from a Docker named volume (`postgres-data`) to a bind mount. For migration details, see `docs/postgres-storage-migration.md`.
+
+### PostgreSQL Version
+
+This environment runs **PostgreSQL 16** (image `postgres:16`), upgraded from PostgreSQL 15 using the dump/restore method.
+
 ## Project Structure
 
 ```
