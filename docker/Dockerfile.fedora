@@ -68,7 +68,7 @@ RUN groupadd --gid "$USER_GID" "$USERNAME" && \
     chmod 0440 "/etc/sudoers.d/$USERNAME"
 
 # Clone dotfiles to a temporary location for the entrypoint to copy
-ARG DOTFILES_REPO=https://github.com/lpoblet/dotfiles
+ARG DOTFILES_REPO=https://github.com/username/dotfiles
 RUN git clone "$DOTFILES_REPO" /opt/dotfiles
 
 # Copy entrypoint script that initializes the home directory on first run

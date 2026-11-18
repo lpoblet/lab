@@ -11,7 +11,7 @@ services:
         USERNAME: ${USERNAME:-student}
         USER_UID: ${USER_UID:-1000}
         USER_GID: ${USER_GID:-1000}
-        DOTFILES_REPO: ${DOTFILES_REPO:-https://github.com/lpoblet/dotfiles}
+        DOTFILES_REPO: ${DOTFILES_REPO:-https://github.com/username/dotfiles}
     container_name: lpic1-debian
     hostname: debian-practice
     privileged: true  # Needed for systemd, disk management, and networking practice
@@ -38,7 +38,7 @@ services:
         USERNAME: ${USERNAME:-student}
         USER_UID: 1001
         USER_GID: 1001
-        DOTFILES_REPO: ${DOTFILES_REPO:-https://github.com/lpoblet/dotfiles}
+        DOTFILES_REPO: ${DOTFILES_REPO:-https://github.com/username/dotfiles}
     container_name: lpic1-ubuntu
     hostname: ubuntu-practice
     privileged: true
@@ -65,7 +65,7 @@ services:
         USERNAME: ${USERNAME:-student}
         USER_UID: ${USER_UID:-1000}
         USER_GID: ${USER_GID:-1000}
-        DOTFILES_REPO: ${DOTFILES_REPO:-https://github.com/lpoblet/dotfiles}
+        DOTFILES_REPO: ${DOTFILES_REPO:-https://github.com/username/dotfiles}
     container_name: lpic1-fedora
     hostname: fedora-practice
     privileged: true
@@ -92,7 +92,7 @@ services:
         USERNAME: ${USERNAME:-student}
         USER_UID: ${USER_UID:-1000}
         USER_GID: ${USER_GID:-1000}
-        DOTFILES_REPO: ${DOTFILES_REPO:-https://github.com/lpoblet/dotfiles}
+        DOTFILES_REPO: ${DOTFILES_REPO:-https://github.com/username/dotfiles}
     container_name: lpic1-arch
     hostname: arch-practice
     privileged: true
@@ -119,7 +119,7 @@ services:
         USERNAME: ${USERNAME:-student}
         USER_UID: ${USER_UID:-1000}
         USER_GID: ${USER_GID:-1000}
-        DOTFILES_REPO: ${DOTFILES_REPO:-https://github.com/lpoblet/dotfiles}
+        DOTFILES_REPO: ${DOTFILES_REPO:-https://github.com/username/dotfiles}
     container_name: lpic1-opensuse
     hostname: opensuse-practice
     privileged: true
@@ -146,7 +146,7 @@ services:
         USERNAME: ${USERNAME:-student}
         USER_UID: ${USER_UID:-1000}
         USER_GID: ${USER_GID:-1000}
-        DOTFILES_REPO: ${DOTFILES_REPO:-https://github.com/lpoblet/dotfiles}
+        DOTFILES_REPO: ${DOTFILES_REPO:-https://github.com/username/dotfiles}
     container_name: lpic1-alpine
     hostname: alpine-practice
     privileged: true

@@ -37,7 +37,7 @@ Running PostgreSQL in Docker gives you:
 
 ## Persistent Storage
 
-This environment uses a **bind mount** for persistent data storage instead of a Docker named volume. The PostgreSQL data directory is stored on a separate partition at `/mnt/backups/data/` on the host machine.
+This environment uses a **bind mount** for persistent data storage instead of a Docker named volume. By default, data is stored in a local `./data` directory within the project. You can configure a custom host path via the `PG_DATA_DIR` environment variable.
 
 ### Configuration
 
@@ -45,22 +45,39 @@ In `docker-compose.yml`, the volume is configured as:
 
 ```yaml
 volumes:
-  - /mnt/backups/data:/var/lib/postgresql/data
+  - ${PG_DATA_DIR:-./data}:/var/lib/postgresql/data
 ```
 
-This means all database files are stored directly on the host filesystem at `/mnt/backups/data/`, surviving container restarts and recreations.
+This means all database files are stored at the path specified by `PG_DATA_DIR` (defaulting to `./data`), surviving container restarts and recreations.
 
 ### Prerequisites
 
 Before starting the container, ensure the host directory exists with correct permissions:
 
 ```bash
-sudo mkdir -p /mnt/backups/data
-sudo chown 70:70 /mnt/backups/data
-sudo chmod 700 /mnt/backups/data
+# Using the default local directory (no extra setup needed)
+# Or, for a custom path:
+sudo mkdir -p /path/to/your/data
+sudo chown 70:70 /path/to/your/data
+sudo chmod 700 /path/to/your/data
 ```
 
 The PostgreSQL container runs as UID 70 (the `postgres` user), so the directory must be owned by that user.
+
+### Environment Variables
+
+Copy `.env.example` to `.env` and adjust values:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Default | Description |
+|---|---|---|
+| `POSTGRES_USER` | `postgres` | Database superuser |
+| `POSTGRES_PASSWORD` | `changeme` | **Change this** — database password |
+| `POSTGRES_DB` | `postgres` | Initial database name |
+| `PG_DATA_DIR` | `./data` | Host path for persistent data |
 
 ### Migration Notes
 

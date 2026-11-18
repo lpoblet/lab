@@ -20,3 +20,9 @@ A Docker-based PostgreSQL practice environment for learning database administrat
 
 See [postgres/README.md](postgres/README.md) for the practice guide and exercises.
 
+### Forgejo
+
+A Docker-based Forgejo (self-hosted Git platform) practice environment with PostgreSQL backend for learning container management, persistent storage, and Git workflows. Connects to the existing PostgreSQL practice container.
+
+See [forgejo/README.md](forgejo/README.md) for quick start and [docs/forgejo-container-guide.md](docs/forgejo-container-guide.md) for the complete guide.
+

@@ -144,6 +144,10 @@ $RECYCLE.BIN/
 # PostgreSQL backups (may contain personal data)
 postgres/backups/
 
+# Local data directories (created by docker-compose)
+postgres/data/
+forgejo/data/
+
 # Archives
 *.tar
 *.tar.gz

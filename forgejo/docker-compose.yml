@@ -1,0 +1,19 @@
+services:
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:17
+    container_name: forgejo
+    restart: unless-stopped
+    ports:
+      - "3000:3000"   # HTTP web interface
+      - "2223:22"     # SSH Git operations (mapped to avoid port 2222 conflict)
+    volumes:
+      - ${FORGEJO_DATA_DIR:-./data}:/data
+    environment:
+      - DATABASE_TYPE=postgres
+      - DB_HOST=${FORGEJO_DB_HOST:-host.docker.internal}
+      - DB_PORT=5432
+      - DB_NAME=${FORGEJO_DB_NAME:-forgejo}
+      - DB_USER=${FORGEJO_DB_USER:-forgejo}
+      - DB_PASSWD=${FORGEJO_DB_PASSWORD:-changeme}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

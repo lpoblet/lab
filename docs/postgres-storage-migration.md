@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document guides the migration of PostgreSQL persistent storage from a Docker named volume to a bind mount on a separate partition (`/mnt/backups/data/`), along with a container image upgrade from `postgres:15` to `postgres:16`.
+This document guides the migration of PostgreSQL persistent storage from a Docker named volume to a bind mount (configurable via `PG_DATA_DIR`, defaulting to `./data`), along with a container image upgrade from `postgres:15` to `postgres:16`.
 
 This is a **major version upgrade** (15 → 16). The dump/restore method is used, which is the safest approach for cross-major-version migrations.
 
@@ -16,7 +16,7 @@ This is a **major version upgrade** (15 → 16). The dump/restore method is used
 
 ## Target State
 
-- **Storage**: Bind mount `/mnt/backups/data/` on the host → `/var/lib/postgresql/data` in the container
+- **Storage**: Bind mount `${PG_DATA_DIR:-./data}` on the host → `/var/lib/postgresql/data` in the container
 - **Image**: `postgres:16`
 - **Container name**: `postgres-practice` (unchanged)
 - **Port**: `5432` (unchanged)
@@ -25,7 +25,7 @@ This is a **major version upgrade** (15 → 16). The dump/restore method is used
 ## Prerequisites
 
 - Docker and Docker Compose installed and running
-- Write access to `/mnt/backups/data/` on the host
+- Write access to the target data directory (default: `./data` within the project)
 - The target partition must have enough free space for the PostgreSQL data directory
 - `shellcheck` installed (for script validation)
 
@@ -94,20 +94,20 @@ This captures all roles, databases, and data in a single SQL file.
 Update `postgres/docker-compose.yml`:
 
 1. Change the image from `postgres:15` to `postgres:16`
-2. Replace the named volume with a bind mount to `/mnt/backups/data/`
+2. Replace the named volume with a bind mount to `${PG_DATA_DIR:-./data}`
 3. Remove the top-level `volumes:` declaration (no longer needed)
 
 ### Step 6: Create Host Directory
 
 ```bash
-# Create the target directory
-sudo mkdir -p /mnt/backups/data
+# Create the target directory (default: ./data, or set PG_DATA_DIR for a custom path)
+mkdir -p ./data
 
 # Set correct ownership (PostgreSQL runs as UID 70 in the container)
-sudo chown 70:70 /mnt/backups/data
+sudo chown 70:70 ./data
 
 # Set correct permissions
-sudo chmod 700 /mnt/backups/data
+sudo chmod 700 ./data
 ```
 
 ### Step 7: Start the New Container
@@ -122,7 +122,7 @@ docker compose pull
 ./bin/start.sh
 ```
 
-The container will initialize a fresh PostgreSQL 16 data directory at `/mnt/backups/data/`.
+The container will initialize a fresh PostgreSQL 16 data directory at the configured data path (default: `./data`).
 
 ### Step 8: Import Data
 
