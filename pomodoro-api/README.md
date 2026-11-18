@@ -39,9 +39,10 @@ Optional:
 
 ## Database
 
-The API targets the `focustodo` database on the PG15 `postgres-practice` container. Its four tables (`projects`, `tasks`, `subtasks`, `pomodoro_sessions`) are defined by `schema.sql` and must stay exactly as the extension export expects; the API adds no columns or tables except Alembic's `alembic_version`.
+The API targets the `focustodo` database on the PG15 `postgres-practice` container. Its four tables (`projects`, `tasks`, `subtasks`, `pomodoro_sessions`) are defined by `schema.sql` and must stay exactly as the extension export expects; the API adds no columns to the Focus To-Do tables — extra data lives in side tables (e.g. `session_details`).
 
 - **Baseline migration** `0001_focus_todo_baseline` embeds the `schema.sql` DDL verbatim with `CREATE TABLE/INDEX IF NOT EXISTS`. On a database already loaded from the export, `alembic upgrade head` only creates `alembic_version`; on an empty database it creates the schema. `tests/test_migration.py` fails if the migration drifts from `schema.sql` or the ORM drifts from the database. If `schema.sql` changes, add a new migration.
+- **Side-table migration** `0002_session_details` adds `session_details(kind, interrupted, interrupt_reason)` for the CLI to record session type and interruption data without touching the four Focus To-Do tables. This keeps the one-time Focus To-Do import schema intact.
 - **Privileges** for the `DATABASE_URL` role (tables are owned by `postgres`):
 
   ```sql
@@ -49,6 +50,7 @@ The API targets the `focustodo` database on the PG15 `postgres-practice` contain
   GRANT USAGE, CREATE ON SCHEMA public TO pomodoro_api;          -- CREATE for alembic_version
   GRANT SELECT ON projects, tasks, subtasks TO pomodoro_api;
   GRANT SELECT, INSERT, UPDATE ON pomodoro_sessions TO pomodoro_api;
+  GRANT SELECT, INSERT, UPDATE ON session_details TO pomodoro_api;
   ```
 
 ### Data model notes
@@ -70,8 +72,8 @@ OpenAPI title: **Pomodoro Attention API**. Interactive docs: `/docs`.
 | --- | --- | --- |
 | `GET` | `/health` | Liveness: `{"status":"ok"}` |
 | `GET` | `/ready` | Readiness: `SELECT 1` against Postgres; `503` if unavailable |
-| `POST` | `/sessions` | Record a finished session (`201`). Body: `task_id`, `interval_seconds` (1–86400, integer); optional `pomodoro_interval` (1–86400), `subtask_id`, `end_date` (default now; naive = UTC), `is_manual` (default `false`). `404` for an unknown/deleted task or subtask, `422` if the subtask belongs to another task or the body is invalid. |
-| `GET` | `/sessions` | List non-deleted sessions, newest `end_date` first. Optional query `from`, `to` (datetimes on `end_date`; naive = UTC) and `task_id`. |
+| `POST` | `/sessions` | Record a finished session (`201`). Body: `kind` (default `"focus"`), `interval_seconds` (1–86400, integer); `task_id` required for focus sessions, omitted for breaks; optional `pomodoro_interval` (1–86400), `subtask_id`, `end_date` (default now; naive = UTC), `is_manual` (default `false`), `interrupted` (default `false`), `interrupt_reason`. `404` for an unknown/deleted task or subtask, `422` if the subtask belongs to another task, a focus session lacks `task_id`, or the body is invalid. |
+| `GET` | `/sessions` | List non-deleted sessions, newest `end_date` first. Optional query `from`, `to` (datetimes on `end_date`; naive = UTC), `task_id`, `kind`, `interrupted`. |
 | `GET` | `/sessions/{session_id}` | One session; `404` if missing or deleted. |
 | `DELETE` | `/sessions/{session_id}` | Soft-delete (`state=-1`), `204`; `404` if missing or already deleted. |
 | `GET` | `/projects` | Read-only list of non-deleted projects. |

@@ -6,7 +6,7 @@ from sqlalchemy import Select, select, update
 from sqlalchemy.orm import Session
 
 from app.db.engine import get_session_factory
-from app.db.models import PomodoroSessionRow, ProjectRow, SubtaskRow, TaskRow
+from app.db.models import PomodoroSessionRow, ProjectRow, SessionDetailRow, SubtaskRow, TaskRow
 from app.domain.catalog import Project, Task
 from app.domain.session import (
     POMODORO_OBJ_TYPE,
@@ -45,6 +45,7 @@ class SubtaskMismatch(Exception):
 
 
 _SESSION_COLUMNS = tuple(column.key for column in PomodoroSessionRow.__table__.columns)
+_DETAIL_COLUMNS = tuple(column.key for column in SessionDetailRow.__table__.columns)
 
 
 def _not_deleted(state_column: Any) -> Any:
@@ -52,15 +53,25 @@ def _not_deleted(state_column: Any) -> Any:
     return state_column.is_distinct_from(STATE_DELETED)
 
 
-def _to_domain(row: PomodoroSessionRow, task_name: str | None) -> PomodoroSession:
+def _to_domain(
+    row: PomodoroSessionRow,
+    task_name: str | None,
+    detail: SessionDetailRow | None = None,
+) -> PomodoroSession:
     data = {key: getattr(row, key) for key in _SESSION_COLUMNS}
+    if detail is not None:
+        for key in _DETAIL_COLUMNS:
+            if key == "session_id":
+                continue
+            data[key] = getattr(detail, key)
     return PomodoroSession.model_validate({**data, "task_name": task_name})
 
 
-def _session_stmt() -> Select[tuple[PomodoroSessionRow, str | None]]:
+def _session_stmt() -> Select[tuple[PomodoroSessionRow, str | None, SessionDetailRow | None]]:
     return (
-        select(PomodoroSessionRow, TaskRow.name)
+        select(PomodoroSessionRow, TaskRow.name, SessionDetailRow)
         .outerjoin(TaskRow, TaskRow.id == PomodoroSessionRow.task_id)
+        .outerjoin(SessionDetailRow, SessionDetailRow.session_id == PomodoroSessionRow.id)
         .where(_not_deleted(PomodoroSessionRow.state))
     )
 
@@ -85,20 +96,24 @@ def create_session(new: NewSession) -> PomodoroSession:
     factory = get_session_factory()
     with factory() as db:
         with db.begin():
-            task = _live_task(db, new.task_id)
-            if new.subtask_id is not None:
-                _check_subtask(db, new.subtask_id, new.task_id)
+            task: TaskRow | None = None
+            task_name: str | None = None
+            if new.task_id is not None:
+                task = _live_task(db, new.task_id)
+                if new.subtask_id is not None:
+                    _check_subtask(db, new.subtask_id, new.task_id)
+                task_name = task.name
             row = PomodoroSessionRow(
                 # Upper-case uuid4 text is the extension's dominant id format.
                 id=str(uuid4()).upper(),
-                task_id=task.id,
+                task_id=task.id if task is not None else None,
                 subtask_id=new.subtask_id,
                 obj_type=POMODORO_OBJ_TYPE,
                 interval_seconds=new.interval_seconds,
                 pomodoro_interval=(
                     new.pomodoro_interval
                     if new.pomodoro_interval is not None
-                    else task.pomodoro_interval
+                    else (task.pomodoro_interval if task is not None else None)
                 ),
                 is_manual=new.is_manual,
                 state=STATE_ACTIVE,
@@ -108,9 +123,15 @@ def create_session(new: NewSession) -> PomodoroSession:
                 end_date=end_date,
             )
             db.add(row)
-            task_name = task.name
+            detail = SessionDetailRow(
+                session_id=row.id,
+                kind=new.kind,
+                interrupted=new.interrupted,
+                interrupt_reason=new.interrupt_reason,
+            )
+            db.add(detail)
         db.refresh(row)
-        return _to_domain(row, task_name)
+        return _to_domain(row, task_name, detail)
 
 
 def get_session(session_id: str) -> PomodoroSession:
@@ -119,14 +140,16 @@ def get_session(session_id: str) -> PomodoroSession:
         result = db.execute(_session_stmt().where(PomodoroSessionRow.id == session_id)).first()
         if result is None:
             raise SessionNotFound(session_id)
-        row, task_name = result
-        return _to_domain(row, task_name)
+        row, task_name, detail = result
+        return _to_domain(row, task_name, detail)
 
 
 def list_sessions(
     from_ts: datetime | None = None,
     to_ts: datetime | None = None,
     task_id: str | None = None,
+    kind: str | None = None,
+    interrupted: bool | None = None,
 ) -> list[PomodoroSession]:
     stmt = _session_stmt()
     if from_ts is not None:
@@ -135,12 +158,16 @@ def list_sessions(
         stmt = stmt.where(PomodoroSessionRow.end_date <= to_ts)
     if task_id is not None:
         stmt = stmt.where(PomodoroSessionRow.task_id == task_id)
+    if kind is not None:
+        stmt = stmt.where(SessionDetailRow.kind == kind)
+    if interrupted is not None:
+        stmt = stmt.where(SessionDetailRow.interrupted == interrupted)
     stmt = stmt.order_by(
         PomodoroSessionRow.end_date.desc().nulls_last(), PomodoroSessionRow.id.desc()
     )
     factory = get_session_factory()
     with factory() as db:
-        return [_to_domain(row, task_name) for row, task_name in db.execute(stmt).all()]
+        return [_to_domain(row, task_name, detail) for row, task_name, detail in db.execute(stmt).all()]
 
 
 def soft_delete_session(session_id: str) -> None:

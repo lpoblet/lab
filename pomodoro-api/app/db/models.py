@@ -117,3 +117,22 @@ class PomodoroSessionRow(Base):
     sync: Mapped[int | None] = mapped_column(SmallInteger)
     creation_date: Mapped[datetime | None] = _timestamptz()
     end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class SessionDetailRow(Base):
+    """Side table for session kind and interruption data.
+
+    This table is independent of the Focus To-Do schema so that the four
+    original tables remain untouched and re-imports still work.
+    """
+
+    __tablename__ = "session_details"
+
+    session_id: Mapped[str] = mapped_column(
+        Text,
+        ForeignKey("pomodoro_sessions.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    interrupted: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    interrupt_reason: Mapped[str | None] = mapped_column(Text)

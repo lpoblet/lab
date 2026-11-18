@@ -18,10 +18,14 @@ def list_sessions(
     from_: datetime | None = Query(default=None, alias="from"),
     to: datetime | None = Query(default=None),
     task_id: str | None = Query(default=None),
+    kind: str | None = Query(default=None),
+    interrupted: bool | None = Query(default=None),
 ) -> list[PomodoroSession]:
     from_ts = _ensure_aware(from_) if from_ is not None else None
     to_ts = _ensure_aware(to) if to is not None else None
-    return repository.list_sessions(from_ts=from_ts, to_ts=to_ts, task_id=task_id)
+    return repository.list_sessions(
+        from_ts=from_ts, to_ts=to_ts, task_id=task_id, kind=kind, interrupted=interrupted
+    )
 
 
 @router.get("/sessions/{session_id}")

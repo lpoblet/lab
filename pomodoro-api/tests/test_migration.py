@@ -20,6 +20,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_SQL = PROJECT_ROOT / "schema.sql"
 BASELINE = PROJECT_ROOT / "migrations" / "versions" / "0001_focus_todo_baseline.py"
 FOCUS_TODO_TABLES = {"projects", "tasks", "subtasks", "pomodoro_sessions"}
+SIDE_TABLES = {"session_details"}
+ALL_TABLES = FOCUS_TODO_TABLES | SIDE_TABLES
 
 
 def _load_baseline() -> ModuleType:
@@ -86,8 +88,8 @@ def _alembic_version(engine: Engine) -> str:
 def test_upgrade_creates_schema_on_fresh_database(scratch_db: tuple[Engine, Config]) -> None:
     engine, config = scratch_db
     command.upgrade(config, "head")
-    assert _public_tables(engine) == FOCUS_TODO_TABLES | {"alembic_version"}
-    assert _alembic_version(engine) == "0001_focus_todo_baseline"
+    assert _public_tables(engine) == ALL_TABLES | {"alembic_version"}
+    assert _alembic_version(engine) == "0002_session_details"
 
 
 def test_upgrade_adopts_preloaded_schema_repeatedly(scratch_db: tuple[Engine, Config]) -> None:
@@ -108,8 +110,8 @@ def test_upgrade_adopts_preloaded_schema_repeatedly(scratch_db: tuple[Engine, Co
     command.upgrade(config, "head")
     command.upgrade(config, "head")
 
-    assert _public_tables(engine) == FOCUS_TODO_TABLES | {"alembic_version"}
-    assert _alembic_version(engine) == "0001_focus_todo_baseline"
+    assert _public_tables(engine) == ALL_TABLES | {"alembic_version"}
+    assert _alembic_version(engine) == "0002_session_details"
     with engine.connect() as connection:
         ids = connection.execute(text("SELECT id FROM pomodoro_sessions")).scalars().all()
     assert ids == ["ABC-UPPER"]
@@ -136,7 +138,7 @@ def _orm_type_name(column_type: object) -> str:
 def test_orm_columns_match_database(scratch_db: tuple[Engine, Config]) -> None:
     engine, config = scratch_db
     command.upgrade(config, "head")
-    assert set(Base.metadata.tables) == FOCUS_TODO_TABLES
+    assert set(Base.metadata.tables) == ALL_TABLES
 
     with engine.connect() as connection:
         for table_name, table in Base.metadata.tables.items():
